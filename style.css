@@ -104,3 +104,4 @@ img{max-width:100%}
 .status{font-size:.8rem;color:var(--muted);text-align:center}
 .ident{grid-template-columns:minmax(0,.7fr) minmax(0,1.2fr) minmax(0,1.1fr)}
 @media (max-width:420px){.ident{grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr)}.ident label:last-child{grid-column:1/-1}}
+@media (max-width:420px){.row3.efetivo{grid-template-columns:repeat(3,minmax(0,1fr))}}
