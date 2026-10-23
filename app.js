@@ -1,5 +1,6 @@
 (function(){
 "use strict";
+const VERSAO="23/10/2026 16:20";
 const $=id=>document.getElementById(id);
 const CLIMAS=["☀️ Bom","⛅ Nublado","🌧️ Chuva","⛈️ Impraticável"];
 const MO=[["m_lid","Líder"],["m_mon","Montador"],["m_aux","Auxiliar"],["m_out","Outros"]];
@@ -530,9 +531,15 @@ if(!instalado&&/iphone|ipad|ipod/i.test(navigator.userAgent)){
   $("instalar").hidden=false;$("b-instalar").hidden=true;
   $("instalar-txt").textContent="Para instalar no iPhone: toque em Compartilhar (quadrado com seta) e depois em Adicionar à Tela de Início.";
 }
-if("serviceWorker" in navigator&&location.protocol==="https:")navigator.serviceWorker.register("sw.js").catch(()=>{});
+if("serviceWorker" in navigator&&location.protocol==="https:"){
+  // busca sempre a versão nova e recarrega quando ela chegar
+  const tinha=!!navigator.serviceWorker.controller;let recarregou=false;
+  navigator.serviceWorker.addEventListener("controllerchange",()=>{if(tinha&&!recarregou){recarregou=true;draftPut({...lerForm(),editId}).catch(()=>{}).finally(()=>location.reload());}});
+  navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}).then(r=>{r.update();document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")r.update();});}).catch(()=>{});
+}
 
 /* ---------- início ---------- */
+$("versao").textContent="Versão "+VERSAO;
 (async()=>{
   try{const d=await draftGet();if(d){preencher(d);editId=d.editId||null;}}catch(e){}
   if(!$("data").value)$("data").value=hoje();
