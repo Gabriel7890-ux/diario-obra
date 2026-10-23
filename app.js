@@ -2,7 +2,7 @@
 "use strict";
 const $=id=>document.getElementById(id);
 const CLIMAS=["☀️ Bom","⛅ Nublado","🌧️ Chuva","⛈️ Impraticável"];
-const MO=[["m_lid","Líder"],["m_mon","Montador"],["m_aux","Auxiliar"]];
+const MO=[["m_lid","Líder"],["m_mon","Montador"],["m_aux","Auxiliar"],["m_out","Outros"]];
 const FIELDS=["idobra","obra","local","data","rdo","resp","hini","hfim","ativ","equip","mat","ocor","obs",...MO.map(m=>m[0])];
 const clima={manha:"",tarde:""};
 let registros=[], editId=null, fotos=[], envio=null;
