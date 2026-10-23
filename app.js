@@ -3,7 +3,7 @@
 const $=id=>document.getElementById(id);
 const CLIMAS=["☀️ Bom","⛅ Nublado","🌧️ Chuva","⛈️ Impraticável"];
 const MO=[["m_enc","Encarregado"],["m_ofi","Oficiais"],["m_aju","Ajudantes"],["m_ope","Operadores"],["m_ter","Terceiros"],["m_out","Outros"]];
-const FIELDS=["obra","data","rdo","resp","hini","hfim","ativ","equip","mat","ocor","obs",...MO.map(m=>m[0])];
+const FIELDS=["idobra","obra","local","data","rdo","resp","hini","hfim","ativ","equip","mat","ocor","obs",...MO.map(m=>m[0])];
 const clima={manha:"",tarde:""};
 let registros=[], editId=null, fotos=[], envio=null;
 
@@ -44,7 +44,9 @@ function nomeArq(base,ext){return (base.normalize("NFD").replace(/[̀-ͯ]/g,"").
 function msg(t,err){const m=$("msg");m.textContent=t;m.className="msg"+(err?" err":"");}
 function msgExp(t,err){const m=$("msg-exp");m.textContent=t;m.className="msg"+(err?" err":"");}
 function pfMsg(t,err){const m=$("pf-msg");m.textContent=t;m.className="msg"+(err?" err":"");}
-function proxRdo(obra){const n=registros.filter(r=>(r.obra||"").toLowerCase()===obra.toLowerCase()&&r._id!==editId).map(r=>parseInt(r.rdo)||0);return n.length?Math.max(...n)+1:1;}
+function obraNome(r){return [r.idobra,r.obra].filter(Boolean).join(" - ")+(r.local?" / "+r.local:"");}
+function obraChave(r){return ((r.idobra||"")+"|"+(r.obra||"")).toLowerCase().trim();}
+function proxRdo(ref){const k=obraChave(ref);const n=registros.filter(r=>obraChave(r)===k&&r._id!==editId).map(r=>parseInt(r.rdo)||0);return n.length?Math.max(...n)+1:1;}
 function abrirWa(t){location.href="https://wa.me/?text="+encodeURIComponent(t);}
 function baixarArquivo(blob,nome){const u=URL.createObjectURL(blob),a=document.createElement("a");a.href=u;a.download=nome;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),60000);}
 
@@ -83,10 +85,15 @@ function validar(){
   return true;
 }
 function limpar(){
-  FIELDS.forEach(f=>{if(!["resp","obra","hini","hfim"].includes(f))$(f).value="";});
+  FIELDS.forEach(f=>{if(!["resp","idobra","obra","local","hini","hfim"].includes(f))$(f).value="";});
   $("data").value=hoje();clima.manha="";clima.tarde="";editId=null;fotos=[];renderFotos();paintClima();update();
 }
 $("f").addEventListener("input",update);
+$("idobra").addEventListener("change",()=>{
+  const id=$("idobra").value.trim();if(!id)return;
+  const ult=registros.filter(r=>(r.idobra||"")===id).sort((a,b)=>(b.salvoEm||"").localeCompare(a.salvoEm||""))[0];
+  if(ult){if(!$("obra").value.trim())$("obra").value=ult.obra||"";if(!$("local").value.trim())$("local").value=ult.local||"";update();}
+});
 $("f").addEventListener("submit",e=>e.preventDefault());
 
 /* ---------- fotos ---------- */
@@ -134,7 +141,7 @@ $("fotos").addEventListener("click",e=>{
 /* ---------- salvar ---------- */
 async function salvar(){
   const r=lerForm();
-  if(!r.rdo){r.rdo=String(proxRdo(r.obra));$("rdo").value=r.rdo;}
+  if(!r.rdo){r.rdo=String(proxRdo(r));$("rdo").value=r.rdo;}
   const id=editId||("rdo-"+Date.now());
   const reg={...r,_id:id,salvoEm:new Date().toISOString()};
   await dbPut(reg);
@@ -144,7 +151,7 @@ async function salvar(){
 
 /* ---------- texto da mensagem ---------- */
 function textoCompleto(r){
-  const L=["*DIÁRIO DE OBRA · RDO nº "+(r.rdo||"-")+"*","*Obra:* "+(r.obra||"-"),"*Data:* "+(fmtData(r.data)||"-")];
+  const L=["*DIÁRIO DE OBRA · RDO nº "+(r.rdo||"-")+"*",...(r.idobra?["*ID:* "+r.idobra]:[]),"*Obra:* "+(r.obra||"-"),...(r.local?["*Local:* "+r.local]:[]),"*Data:* "+(fmtData(r.data)||"-")];
   if(r.hini||r.hfim)L.push("*Expediente:* "+(r.hini||"?")+" às "+(r.hfim||"?"));
   L.push("*Responsável:* "+(r.resp||"-"),"");
   L.push("*Tempo:* manhã "+(semIcone(r.clima_manha)||"não informado")+" | tarde "+(semIcone(r.clima_tarde)||"não informado"));
@@ -159,7 +166,7 @@ function textoCompleto(r){
 }
 function textoCurto(r){
   const n=(r.fotos||[]).length;
-  return "*RDO nº "+(r.rdo||"-")+"* · "+(r.obra||"")+"\n"+fmtData(r.data)+" · "+(r.resp||"")+"\nDiário de obra em "+((envio&&envio.F&&envio.F.rotulo)||"PDF")+(n?" com "+n+" foto"+(n>1?"s":"")+" e legendas":"")+".";
+  return "*RDO nº "+(r.rdo||"-")+"* · "+obraNome(r)+"\n"+fmtData(r.data)+" · "+(r.resp||"")+"\nDiário de obra em "+((envio&&envio.F&&envio.F.rotulo)||"PDF")+(n?" com "+n+" foto"+(n>1?"s":"")+" e legendas":"")+".";
 }
 
 /* ---------- PDF ---------- */
@@ -210,7 +217,7 @@ async function gerarPdf(lst){
     if(n>0){rodape();doc.addPage();}
     cabecalho(r);
     secao("Identificação",r);
-    campos([["Obra / local",r.obra],["Responsável",r.resp],["Data",fmtData(r.data)],["Expediente",(r.hini||"?")+" às "+(r.hfim||"?")],
+    campos([["ID da obra",r.idobra],["Obra",r.obra],["Local",r.local],["Responsável",r.resp],["Data",fmtData(r.data)],["Expediente",(r.hini||"?")+" às "+(r.hfim||"?")],
       ["Tempo manhã",semIcone(r.clima_manha)||"não informado"],["Tempo tarde",semIcone(r.clima_tarde)||"não informado"]],r);
     secao("Mão de obra",r);
     const mo=MO.filter(([k])=>parseInt(r[k])>0).map(([k,nm])=>nm+": "+parseInt(r[k]));
@@ -279,7 +286,8 @@ async function gerarDocx(r){
   const campo=(k,v)=>new D.TableCell({borders:bordas0,children:[p(t(k.toUpperCase(),{bold:true,color:CZ,size:14}),{after:20}),p(t(v||"-"),{after:100})]});
   const linha=(a,b)=>new D.TableRow({children:[campo(...a),campo(...b)]});
   const ident=new D.Table({width:{size:100,type:D.WidthType.PERCENTAGE},borders:bordas0,rows:[
-    linha(["Obra / local",r.obra],["Responsável",r.resp]),
+    linha(["ID da obra",r.idobra],["Obra",r.obra]),
+    linha(["Local",r.local],["Responsável",r.resp]),
     linha(["Data",fmtData(r.data)],["Expediente",(r.hini||"?")+" às "+(r.hfim||"?")]),
     linha(["Tempo manhã",semIcone(r.clima_manha)||"não informado"],["Tempo tarde",semIcone(r.clima_tarde)||"não informado"])]});
   const mo=MO.filter(([k])=>parseInt(r[k])>0).map(([k,nm])=>nm+": "+parseInt(r[k]));
@@ -313,7 +321,7 @@ async function gerarDocx(r){
   const ass=txt=>new D.TableCell({borders:bordas0,children:[p(t(""),{before:500,after:0,border:{bottom:{color:CZ,space:1,style:D.BorderStyle.SINGLE,size:6}}}),p(t(txt,{color:CZ,size:16}))]});
   corpo.push(new D.Table({width:{size:100,type:D.WidthType.PERCENTAGE},borders:bordas0,rows:[new D.TableRow({cantSplit:true,children:[ass("Responsável pela obra"),new D.TableCell({borders:bordas0,children:[p(t(""))]}),ass("Fiscalização")]})]}));
   const doc=new D.Document({
-    creator:"Diário de Obra ECTAS",title:"RDO "+(r.rdo||"")+" "+(r.obra||""),
+    creator:"Diário de Obra ECTAS",title:"RDO "+(r.rdo||"")+" "+obraNome(r),
     styles:{default:{document:{run:{font:F,size:20}}}},
     sections:[{properties:{page:{size:{width:11906,height:16838},margin:{top:851,bottom:851,left:1021,right:1021}}},
       footers:{default:new D.Footer({children:[p(t("ECTAS Saneamento S.A. · Rua Hans Dieter Schmidt, 1803, Distrito Industrial Norte, Joinville/SC · (47) 3033-1200",{color:CZ,size:14}),{align:D.AlignmentType.CENTER,after:0})]})},
@@ -344,12 +352,12 @@ async function compartilhar(){
 async function prepararEnvio(r,fmt){
   const F=FORMATOS[fmt||"pdf"];
   const blob=await F.gerar(r);
-  const nome=nomeArq("RDO "+(r.rdo||"")+" "+(r.obra||"")+" "+(r.data||""),F.ext);
+  const nome=nomeArq("RDO "+(r.rdo||"")+" "+[r.idobra,r.obra].filter(Boolean).join(" ")+" "+(r.data||""),F.ext);
   const file=new File([blob],nome,{type:F.tipo});
   envio={r,file,blob,nome,F};
   const n=(r.fotos||[]).length;
   $("pf-tit").textContent=F.rotulo+" do RDO "+(r.rdo||"")+" pronto";
-  $("pf-info").textContent=(r.obra||"")+" · "+fmtData(r.data)+" · "+(n?n+" foto"+(n>1?"s":"")+" com legenda":"sem fotos")+".";
+  $("pf-info").textContent=obraNome(r)+" · "+fmtData(r.data)+" · "+(n?n+" foto"+(n>1?"s":"")+" com legenda":"sem fotos")+".";
   $("pf-thumbs").innerHTML=(r.fotos||[]).map((f,i)=>`<figure><img src="${esc(URL.createObjectURL(f.blob))}" alt="Foto ${i+1}"><figcaption>${i+1}. ${esc(f.desc||"sem legenda")}</figcaption></figure>`).join("");
   $("pf-nome").textContent=nome;
   const share=podeCompartilhar(file);
@@ -366,7 +374,7 @@ $("pf-enviar").onclick=()=>{
 };
 // fotos soltas, com o texto do RDO como legenda
 function arquivosFotos(r){
-  const base=nomeArq("RDO "+(r.rdo||"")+" "+(r.obra||""),"x").slice(0,-2);
+  const base=nomeArq("RDO "+(r.rdo||"")+" "+[r.idobra,r.obra].filter(Boolean).join(" "),"x").slice(0,-2);
   return (r.fotos||[]).filter(f=>f&&f.blob).map((f,i)=>new File([f.blob],base+"_foto"+(i+1)+".jpg",{type:"image/jpeg"}));
 }
 function textoComFotos(r){
@@ -414,7 +422,7 @@ $("b-save").onclick=async()=>{
   try{const r=await salvar();limpar();msg("RDO "+r.rdo+" salvo neste celular.");}
   catch(e){msg("Não consegui salvar ("+(e&&e.message||e)+").",true);}
 };
-$("b-txt").onclick=()=>{if(!validar())return;const r=lerForm();if(!r.rdo){r.rdo=String(proxRdo(r.obra));$("rdo").value=r.rdo;}abrirWa(textoCompleto(r));};
+$("b-txt").onclick=()=>{if(!validar())return;const r=lerForm();if(!r.rdo){r.rdo=String(proxRdo(r));$("rdo").value=r.rdo;}abrirWa(textoCompleto(r));};
 let confirmLimpar=false;
 $("b-limpar").onclick=()=>{
   if(!confirmLimpar){confirmLimpar=true;$("b-limpar").textContent="Toque de novo para confirmar";setTimeout(()=>{confirmLimpar=false;$("b-limpar").textContent="Limpar formulário";},3000);return;}
@@ -426,12 +434,15 @@ function tab(h){$("t-novo").setAttribute("aria-selected",String(!h));$("t-hist")
 $("t-novo").onclick=()=>tab(false);$("t-hist").onclick=()=>tab(true);
 function filtrados(asc){
   const o=$("fobra").value;
-  return registros.filter(r=>!o||r.obra===o).sort((a,b)=>{const d=(a.data||"").localeCompare(b.data||"")||(parseInt(a.rdo)||0)-(parseInt(b.rdo)||0);return asc?d:-d;});
+  return registros.filter(r=>!o||obraNome(r)===o).sort((a,b)=>{const d=(a.data||"").localeCompare(b.data||"")||(parseInt(a.rdo)||0)-(parseInt(b.rdo)||0);return asc?d:-d;});
 }
 let thumbUrls=[];
 function render(){
-  const obras=[...new Set(registros.map(r=>r.obra).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt"));
-  $("obras").innerHTML=obras.map(o=>`<option value="${esc(o)}">`).join("");
+  const uniq=k=>[...new Set(registros.map(r=>r[k]).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),"pt"));
+  $("ids").innerHTML=uniq("idobra").map(o=>`<option value="${esc(o)}">`).join("");
+  $("obras").innerHTML=uniq("obra").map(o=>`<option value="${esc(o)}">`).join("");
+  $("locais").innerHTML=uniq("local").map(o=>`<option value="${esc(o)}">`).join("");
+  const obras=[...new Set(registros.map(obraNome).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt"));
   const sel=$("fobra"),cur=sel.value;
   sel.innerHTML='<option value="">Todas as obras</option>'+obras.map(o=>`<option${o===cur?" selected":""}>${esc(o)}</option>`).join("");
   $("hist-n").textContent=registros.length?"("+registros.length+")":"";
@@ -442,7 +453,7 @@ function render(){
     const fs=(r.fotos||[]).filter(f=>f&&f.blob);
     const th=fs.map((f,i)=>{const u=URL.createObjectURL(f.blob);thumbUrls.push(u);return `<figure><img src="${u}" alt="Foto ${i+1}" loading="lazy"><figcaption>${esc(f.desc||"Foto "+(i+1))}</figcaption></figure>`;}).join("");
     return `<article class="entry">
-      <div class="top"><h3>${esc(r.obra)}</h3><span class="rdo">RDO ${esc(r.rdo||"-")}</span></div>
+      <div class="top"><h3>${esc(obraNome(r))}</h3><span class="rdo">RDO ${esc(r.rdo||"-")}</span></div>
       <div class="meta">${esc(fmtData(r.data))} · ${esc(r.resp)} · <span class="num">${total(r)}</span> pessoas</div>
       ${r.ocor?'<div><span class="pill alert">Ocorrência</span></div>':""}
       <div class="body">${esc((r.ativ||"").split("\n")[0])}${(r.ativ||"").includes("\n")?" …":""}</div>
@@ -490,7 +501,7 @@ $("b-xlsx").onclick=async()=>{
   try{
     msgExp("Gerando a planilha…");await carregarXlsx();
     const rows=lst.map(r=>{
-      const o={"Obra":r.obra,"RDO":parseInt(r.rdo)||r.rdo,"Data":fmtData(r.data),"Responsável":r.resp,"Início":r.hini,"Fim":r.hfim,"Tempo manhã":semIcone(r.clima_manha),"Tempo tarde":semIcone(r.clima_tarde)};
+      const o={"ID":r.idobra||"","Obra":r.obra,"Local":r.local||"","RDO":parseInt(r.rdo)||r.rdo,"Data":fmtData(r.data),"Responsável":r.resp,"Início":r.hini,"Fim":r.hfim,"Tempo manhã":semIcone(r.clima_manha),"Tempo tarde":semIcone(r.clima_tarde)};
       MO.forEach(([k,n])=>o[n]=parseInt(r[k])||0);
       Object.assign(o,{"Total efetivo":total(r),"Atividades executadas":r.ativ,"Equipamentos":r.equip,"Materiais recebidos":r.mat,"Ocorrências":r.ocor,"Observações":r.obs,
         "Fotos (legendas)":(r.fotos||[]).map((f,i)=>(i+1)+". "+(f.desc||"sem legenda")).join("\n")});

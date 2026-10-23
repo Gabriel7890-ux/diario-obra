@@ -60,10 +60,12 @@
     <div style="display:flex;flex-direction:column;gap:14px">
     <fieldset>
       <legend>Identificação</legend>
-      <label>Obra / local
-        <input id="obra" list="obras" required placeholder="Ex.: 2626 - AQUION / Poços de Caldas">
-        <datalist id="obras"></datalist>
-      </label>
+      <div class="row3 ident">
+        <label>ID<input id="idobra" list="ids" inputmode="numeric" class="num" placeholder="Ex.: 2626"></label>
+        <label>Obra<input id="obra" list="obras" required placeholder="Ex.: AQUION"></label>
+        <label>Local<input id="local" list="locais" placeholder="Ex.: Poços de Caldas"></label>
+      </div>
+      <datalist id="ids"></datalist><datalist id="obras"></datalist><datalist id="locais"></datalist>
       <div class="row">
         <label>Data<input id="data" type="date" required class="num"></label>
         <label>Nº do RDO<input id="rdo" type="number" min="1" inputmode="numeric" class="num" placeholder="auto"></label>

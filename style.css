@@ -102,3 +102,5 @@ img{max-width:100%}
 .instalar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
 .instalar .btn{padding:8px 14px;font-size:.85rem}
 .status{font-size:.8rem;color:var(--muted);text-align:center}
+.ident{grid-template-columns:minmax(0,.7fr) minmax(0,1.2fr) minmax(0,1.1fr)}
+@media (max-width:420px){.ident{grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr)}.ident label:last-child{grid-column:1/-1}}
